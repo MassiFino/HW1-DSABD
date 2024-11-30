@@ -1,0 +1,40 @@
+services:
+  server:
+    build: ./DockerCompose/server
+    ports:
+      - "50052:50052"  # Porta 50051 del container esposta sulla 8081 dell'host
+
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_USER=root
+      - DATABASE_PASSWORD=1234
+      - DATABASE_NAME=yfinance_db
+      - DATABASE_PORT=3306
+    depends_on:
+      - db
+    restart: always
+  
+  data_collector:
+    build: ./DockerCompose/DataCollector
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_USER=root
+      - DATABASE_PASSWORD=1234
+      - DATABASE_NAME=yfinance_db
+    depends_on:
+      - db
+    restart: always
+
+  db:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: "1234"         # Password per l'utente root
+      MYSQL_DATABASE: "yfinance_db"      # Nome del database creato automaticamente       
+    ports:
+      - "3308:3306"  # Mappa la porta 3306 del container alla porta 3308 dell'host
+
+    volumes:
+      - ./db-data:/var/lib/mysql  # Volume per salvare i dati del database
+      
+volumes:
+  db-data:  # Definizione del volume per il database

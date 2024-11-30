@@ -1,0 +1,5 @@
+grpcio 
+grpcio-tools
+yfinance
+mysql-connector-python
+email-validator

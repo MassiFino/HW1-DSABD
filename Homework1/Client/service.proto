@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package echo;
+
+service EchoService {
+  rpc LoginUser (LoginUserRequest) returns (LoginUserReply) {}
+  rpc RegisterUser (RegisterUserRequest) returns (RegisterUserReply) {}
+  rpc AddTickerUtente(AddTickerUtenteRequest) returns (AddTickerUtenteReply){}
+  rpc ShowTickersUser(ShowTickersUserRequest) returns (ShowTickersUserReply){}
+  rpc DeleteTickerUser(DeleteTickerUserRequest) returns (DeleteTickerUserReply){}
+  rpc UpdateUser (UpdateUserRequest) returns (UpdateUserReply) {}
+  rpc DeleteUser (DeleteUserRequest) returns (DeleteUserReply) {}
+  rpc GetLatestValue (GetLatestValueRequest) returns (GetLatestValueReply) {}
+  rpc GetAverageValue (GetAverageValueRequest) returns (GetAverageValueReply) {}
+
+}
+
+message LoginUserRequest {
+  string email = 1;
+}
+
+message LoginUserReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message RegisterUserRequest {
+  string email = 1;
+  string ticker = 2; // Codice dell'azione (es. "AAPL" per Apple)
+}
+message RegisterUserReply {
+  bool success = 1; // Indica se la registrazione è avvenuta con successo
+  string message = 2; // Messaggio di conferma o errore
+}
+
+
+message AddTickerUtenteRequest {
+  string ticker = 1;
+}
+
+message AddTickerUtenteReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message ShowTickersUserRequest {
+
+}
+
+message ShowTickersUserReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteTickerUserRequest {
+  string ticker = 1;
+}
+
+message DeletTickerUserReply {
+  bool success = 1;
+  string message = 2;
+}
+
+
+message UpdateUserRequest {
+  string ticker_old = 1;
+  string ticker = 2; // Nuovo codice dell'azione
+}
+
+message UpdateUserReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteUserRequest {
+}
+message DeleteUserReply {
+  bool success = 1;
+  string message = 2;
+}
+
+
+message GetLatestValueRequest {
+  string ticker = 1;
+}
+
+message GetLatestValueReply {
+  bool success = 1;
+  string message = 2;
+  string ticker = 3;
+  double stock_value = 4;
+  string timestamp = 5;
+}
+
+message GetAverageValueRequest {
+  string ticker = 1;
+  int32 num_values = 2;
+}
+
+message GetAverageValueReply {
+  bool success = 1;
+  string message = 2;
+  double average_stock_value = 3;
+  string timestamp = 4;
+  string ticker = 5;
+}
