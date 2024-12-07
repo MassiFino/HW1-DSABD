@@ -43,6 +43,57 @@ def verifica_ticker(ticker):
     print("Ticker non valido. Riprova.")
     return False
 
+def inserisci_valori_min_max():
+    max_value = None
+    min_value = None
+
+    while True:
+        valori = input("Vuoi inserire un valore di minimo o massimo (o entrambi) per il tuo ticker? (s/n): ").lower()
+        if valori in ('s', 'n'):
+            if valori == 's':
+                # Inserimento valore massimo
+                while True:
+                    max_input = input("Inserisci il valore massimo (oppure 0 se non vuoi inserirlo): ").strip()
+                    if max_input == '0':
+                        max_value = None
+                        break
+                    else:
+                        try:
+                            max_value = float(max_input)
+                            break
+                        except ValueError:
+                            print("Devi inserire un valore numerico (float). Riprova.")
+                
+                # Inserimento valore minimo
+                while True:
+                    min_input = input("Inserisci il valore minimo (oppure 0 se non vuoi inserirlo): ").strip()
+                    if min_input == '0':
+                        min_value = None
+                        break
+                    else:
+                        try:
+                            min_value = float(min_input)
+                            # Verifica coerenza solo se entrambi sono impostati
+                            if max_value is not None and min_value >= max_value:
+                                print("Il valore minimo deve essere inferiore al valore massimo. Riprova.")
+                            else:
+                                break
+                        except ValueError:
+                            print("Devi inserire un valore numerico (float). Riprova.")
+
+                # Se l'utente non inserisce uno dei due valori, restituisce 0 al suo posto
+                return (max_value if max_value is not None else 0, 
+                        min_value if min_value is not None else 0)
+
+            else:
+                # Utente ha scelto 'n', quindi nessun valore
+                return 0, 0
+        else:
+            print("Scelta non valida. Riprova.")
+
+
+
+
 def reg_login(stub):
     
     while True:
@@ -65,14 +116,17 @@ def reg_login(stub):
                     ticker = input("Inserisci ticker iniziale: ").upper()
                     if verifica_ticker(ticker):
                         break
-                
+                #chiedo all'utente se vuole inserire un valore massimo e minimo
+                max_value, min_value = inserisci_valori_min_max()
+                       
                 userid = genera_userid()
 
                 # Crea i metadati da passare nelle richieste gRPC
                 metadata = [
                     ('userid', userid)
                 ]
-                request = service_pb2.RegisterUserRequest(email=email, ticker=ticker)
+
+                request = service_pb2.RegisterUserRequest(email=email, ticker=ticker, max_value=max_value, min_value=min_value)
                 try:
                     response = stub.RegisterUser(request, metadata=metadata)
                     if not response.success:
@@ -123,13 +177,14 @@ def operazioni(stub):
     while True:
         print("\nScegli un'opzione:")
         print("1. Aggiungi ticker")
-        print("2. Visualizza tutti i ticker")
-        print("3. Aggiorna un ticker")
+        print("2. Visualizza tutti i ticker") #mostrare anche minimo e massimo
+        print("3. Sostituisci ticker")
         print("4. Elimina un ticker ")
-        print("5. Ottieni ultimo valore")
-        print("6. Ottieni media valori")
-        print("7. Elimina utente")
-        print("8. Esci")
+        print("5. Modifica/Aggiungi valore minimo e massimo di un ticker") # da fare
+        print("6. Ottieni ultimo valore")
+        print("7. Ottieni media valori")
+        print("8. Elimina utente")
+        print("9. Esci")
 
         scelta = input("Inserisci il numero dell'operazione: ")
 
@@ -139,7 +194,9 @@ def operazioni(stub):
                 if verifica_ticker(ticker):  # Controllo del ticker
                     break
 
-            request = service_pb2.AddTickerUtenteRequest(ticker=ticker)
+            max_value, min_value = inserisci_valori_min_max()
+            
+            request = service_pb2.AddTickerUtenteRequest(ticker=ticker, max_value=max_value, min_value=min_value)
 
             try:
                 response = stub.AddTickerUtente(request)
@@ -175,6 +232,9 @@ def operazioni(stub):
                     break
                 print("Il nuovo ticker deve essere diverso da quello vecchio. Riprova.")
 
+            max_value, min_value = inserisci_valori_min_max()
+
+
             requestid = genera_requestid()
 
             # Crea i metadati da passare nelle richieste gRPC
@@ -182,7 +242,7 @@ def operazioni(stub):
                 ('requestid', requestid)
             ]
             
-            request = service_pb2.UpdateUserRequest(ticker_old=ticker_old, ticker=ticker)
+            request = service_pb2.UpdateUserRequest(ticker_old=ticker_old, ticker=ticker, max_value=max_value, min_value=min_value)
             try:
                 response = stub.UpdateUser(request, metadata=metadata)
                 print(f"Risultato: {response.message}")
@@ -202,8 +262,27 @@ def operazioni(stub):
                 print(f"Risultato: {response.message}")
             except grpc.RpcError as e:
                 print(f"Errore: {e.code()} - {e.details()}")
-
         elif scelta == "5":
+            while True:
+                ticker = input("Inserisci ticker di cui vuoi aggiungere/ modificare il valore: ").upper()
+                if verifica_ticker(ticker):  # Controllo del ticker
+                    break
+
+            max_value, min_value = inserisci_valori_min_max()
+
+            request = service_pb2.UpdateMinMaxValueRequest(ticker=ticker, max_value=max_value, min_value=min_value)
+            try:
+                response = stub.UpdateMinMaxValue(request)
+                if not response.success:
+                    print(f"{response.message}: {response.ticker}")
+                else:
+                    print(f"{response.message}")
+            except grpc.RpcError as e:
+                print(f"Errore: {e.code()} - {e.details()}")
+
+
+
+        elif scelta == "6":
             while True:
                 ticker = input("Inserisci ticker: ").upper()
                 if verifica_ticker(ticker):  # Controllo del ticker
@@ -219,7 +298,7 @@ def operazioni(stub):
             except grpc.RpcError as e:
                 print(f"Errore: {e.code()} - {e.details()}")
 
-        elif scelta == "6":
+        elif scelta == "7":
             while True:
                 ticker = input("Inserisci ticker: ").upper()
                 if verifica_ticker(ticker):  # Controllo del ticker
@@ -250,7 +329,7 @@ def operazioni(stub):
             except grpc.RpcError as e:
                 print(f"Errore: {e.code()} - {e.details()}")
 
-        elif scelta == "7":
+        elif scelta == "8":
             request = service_pb2.DeleteUserRequest()
             try:
                 response = stub.DeleteUser(request)
@@ -259,7 +338,7 @@ def operazioni(stub):
             except grpc.RpcError as e:
                 print(f"Errore: {e.code()} - {e.details()}")
 
-        elif scelta == "8":
+        elif scelta == "9":
             print("Uscita...")
             break
 

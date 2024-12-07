@@ -12,6 +12,7 @@ service EchoService {
   rpc DeleteUser (DeleteUserRequest) returns (DeleteUserReply) {}
   rpc GetLatestValue (GetLatestValueRequest) returns (GetLatestValueReply) {}
   rpc GetAverageValue (GetAverageValueRequest) returns (GetAverageValueReply) {}
+  rpc UpdateMinMaxValue (UpdateMinMaxValueRequest) returns (UpdateMinMaxValueReply) {}
 
 }
 
@@ -27,7 +28,10 @@ message LoginUserReply {
 message RegisterUserRequest {
   string email = 1;
   string ticker = 2; // Codice dell'azione (es. "AAPL" per Apple)
+  float max_value = 3; // Valore massimo (numero decimale)
+  float min_value = 4; // Valore minimo (numero decimale)
 }
+
 message RegisterUserReply {
   bool success = 1; // Indica se la registrazione è avvenuta con successo
   string message = 2; // Messaggio di conferma o errore
@@ -36,6 +40,8 @@ message RegisterUserReply {
 
 message AddTickerUtenteRequest {
   string ticker = 1;
+  float max_value = 2; // Valore massimo (numero decimale)
+  float min_value = 3; // Valore minimo (numero decimale)
 }
 
 message AddTickerUtenteReply {
@@ -50,13 +56,14 @@ message ShowTickersUserRequest {
 message ShowTickersUserReply {
   bool success = 1;
   string message = 2;
+  string ticker = 3;
 }
 
 message DeleteTickerUserRequest {
   string ticker = 1;
 }
 
-message DeletTickerUserReply {
+message DeleteTickerUserReply {
   bool success = 1;
   string message = 2;
 }
@@ -65,6 +72,8 @@ message DeletTickerUserReply {
 message UpdateUserRequest {
   string ticker_old = 1;
   string ticker = 2; // Nuovo codice dell'azione
+  float max_value = 3; // Valore massimo (numero decimale)
+  float min_value = 4; // Valore minimo (numero decimale)
 }
 
 message UpdateUserReply {
@@ -72,8 +81,23 @@ message UpdateUserReply {
   string message = 2;
 }
 
+
+message UpdateMinMaxValueRequest {
+    string ticker = 1;
+    float max_value = 2;
+    float min_value = 3;
+}
+
+message UpdateMinMaxValueReply {
+    bool success = 1;
+    string message = 2;
+    string ticker = 3;
+}
+
+
 message DeleteUserRequest {
 }
+
 message DeleteUserReply {
   bool success = 1;
   string message = 2;

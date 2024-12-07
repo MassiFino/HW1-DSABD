@@ -95,7 +95,8 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
 
         cursor.execute("SELECT email FROM Users WHERE email = %s", (request.email,))
         if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO Users (email) VALUES (%s)", (request.email,))    
+            cursor.execute("INSERT INTO Users (email) VALUES (%s)", (request.email,))
+            print("utente inserito")
 
         else:
             response = service_pb2.RegisterUserReply(
@@ -113,7 +114,9 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
         if cursor.fetchone() is None:
             cursor.execute("INSERT INTO Tickers (ticker) VALUES (%s)", (request.ticker,))
         
-        cursor.execute("INSERT INTO UserTickers (user, ticker) VALUES (%s, %s)", (request.email, request.ticker))
+        print("abbiamo inserito il ticker se non presente")
+        cursor.execute("INSERT INTO UserTickers (user, ticker, max_value, min_value) VALUES (%s, %s, %s, %s)", (request.email, request.ticker, request.max_value, request.min_value))
+        print("abbiamo inserito il ticker per l'utente")
         conn.commit()
 
         conn.close()
@@ -192,7 +195,7 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
         if cursor.fetchone() is None:
             cursor.execute("INSERT INTO Tickers (ticker) VALUES (%s)", (request.ticker,))
             
-        cursor.execute("UPDATE UserTickers SET ticker = %s WHERE user = %s AND ticker = %s", (request.ticker, identifier, request.ticker_old))
+        cursor.execute("UPDATE UserTickers SET ticker = %s, max_value = %s, min_value = %s WHERE user = %s AND ticker = %s", (request.ticker,request.max_value, request.min_value, identifier, request.ticker_old))
 
         cursor.execute("SELECT COUNT(*) FROM UserTickers WHERE ticker = %s", (request.ticker_old,))
         count = cursor.fetchone()[0]  # Ottieni il numero di associazioni
@@ -324,7 +327,7 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
         if cursor.fetchone() is None:
             cursor.execute("INSERT INTO Tickers (ticker) VALUES (%s)", (request.ticker,))
         
-        cursor.execute("INSERT INTO UserTickers (user, ticker) VALUES (%s, %s)", (identifier, request.ticker))
+        cursor.execute("INSERT INTO UserTickers (user, ticker, max_value, min_value) VALUES (%s, %s, %s, %s)", (identifier, request.ticker, request.max_value, request.min_value))
         
         conn.commit()
         conn.close()
@@ -346,7 +349,7 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
         
         cursor = conn.cursor()
          #controllo se l'utente ha già quel ticker
-        cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s", (identifier,))
+        cursor.execute("SELECT ticker, max_value, min_value FROM UserTickers WHERE user = %s", (identifier,))
         ticker= cursor.fetchall()
         
         if not ticker:
@@ -356,7 +359,8 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
                 ticker=""
             )
         
-        tickers_list = "\n".join([row[0] for row in ticker])
+        tickers_list = "\n".join([f"Ticker: {row[0]}, Max: {row[1]}, Min: {row[2]}" for row in ticker])
+
         
         conn.close()
         return service_pb2.ShowTickersUserReply(
@@ -490,6 +494,47 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
             timestamp=datetime_str
         )
 
+    #metodo per modificare il valore minimo e massimo di un ticker
+    def UpdateMinMaxValue(self, request, context):
+        conn = self.get_db_connection()
+        if conn is None:
+            return service_pb2.UpdateMinMaxValueReply(
+                success=False, 
+                message="Errore durante la connessione al database!"
+            )
+        
+        cursor = conn.cursor()
+        cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s AND ticker = %s", (identifier,request.ticker))
+
+        row = cursor.fetchone()
+
+        if row is None:
+            print("Nessuna riga trovata per l'utente specificato.")
+            return service_pb2.UpdateMinMaxValueReply(
+            success=False,
+            ticker=request.ticker,
+            message = "Non hai questo ticker tra quelli di interesse, codice ticker"
+            )
+        
+        #prima di modificare controllo se i valori inseriti sono uguali a quelli già presenti
+        cursor.execute("SELECT max_value, min_value FROM UserTickers WHERE user = %s AND ticker = %s", (identifier, request.ticker))
+        row = cursor.fetchone()
+        if row[0] == request.max_value and row[1] == request.min_value:
+            return service_pb2.UpdateMinMaxValueReply(
+            success=False,
+            ticker=request.ticker,
+            message = "I valori inseriti sono uguali a quelli già presenti"
+            )
+
+        cursor.execute("UPDATE UserTickers SET max_value = %s, min_value = %s WHERE user = %s AND ticker = %s", (request.max_value, request.min_value, identifier, request.ticker))
+
+        conn.commit()
+        conn.close()
+
+        return service_pb2.UpdateMinMaxValueReply(
+            success=True,
+            message="Valori aggiornati con successo"
+        )
 
 
 # Funzione per avviare il server
