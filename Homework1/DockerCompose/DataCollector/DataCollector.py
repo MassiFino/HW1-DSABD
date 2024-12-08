@@ -4,6 +4,8 @@ import mysql.connector
 import yfinance as yf
 import time
 from circuit import CircuitBreaker, CircuitBreakerOpenException
+from confluent_kafka import Producer
+import json
 
 # Configurazione del Circuit Breaker
 circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=5)
@@ -16,6 +18,18 @@ db_config = {
     'database': 'yfinance_db',  # Il nome del database che hai creato nel tuo Docker Compose
     'port': 3306,
 }
+
+
+producer_config = {
+    'bootstrap.servers': 'localhost:29092',  # Kafka broker address
+    'acks': 'all',  # Ensure all in-sync replicas acknowledge the message
+    'batch.size': 500,  # non so se serve
+    'max.in.flight.requests.per.connection': 1,  # Only one in-flight request per connection
+    'retries': 3  # Retry up to 3 times on failure
+}
+
+producer = Producer(producer_config)
+topic = 'to-alert-system'
 
 def get_db_connection():
     try:
@@ -101,13 +115,34 @@ def process_ticker(ticker):
     :param ticker: Codice del titolo azionario.
     """
     try:
-        # Proteggi l'intera chiamata a yfinance, inclusi i dati storici e il prezzo corrente
+
         stock_price = get_stock_price(ticker)
         timestamp = datetime.now()
         save_ticker_data(ticker, stock_price, timestamp)
         print(f"Dati salvati per {ticker}: {stock_price} @ {timestamp}")
     except Exception as e:
         print(f"[Errore] Elaborazione fallita per {ticker}: {e}")
+
+def delivery_report(err, msg):
+    """Callback to report the result of message delivery."""
+    if err:
+        print(f"Delivery failed: {err}")
+    else:
+        print(f"Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
+
+def produce_async(producer, topic):
+
+    while True:
+    # Generate a random value following a normal distribution
+        timestamp = datetime.now().isoformat() 
+        message = {'timestamp': timestamp, 'msg': 'aggiornamento valori completato'} 
+        
+        # Produce the message to TOPIC1
+        #la callback serve per sapere se il messaggio è stato inviato correttamente in modo asincrono
+        producer.produce(topic, json.dumps(message), callback=delivery_report)
+        producer.flush()
+        print(f"Produced: {message}")
+        break
 
 
 def run():
@@ -127,8 +162,11 @@ def run():
             process_ticker(ticker)
 
         print("[Info] Aggiornamento completato.")
+
     except Exception as e:
         print(f"[Errore] Errore generale durante l'esecuzione: {e}")
+
+    produce_async(producer, topic)
 
 
 if __name__ == "__main__":
