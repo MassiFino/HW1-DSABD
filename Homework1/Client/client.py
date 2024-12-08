@@ -48,7 +48,7 @@ def inserisci_valori_min_max():
     min_value = None
 
     while True:
-        valori = input("Vuoi inserire un valore di minimo o massimo (o entrambi) per il tuo ticker? (s/n): ").lower()
+        valori = input("Vuoi inserire un valore di minimo o massimo (o entrambi) da tener traccia per il tuo ticker? (s/n): ").lower()
         if valori in ('s', 'n'):
             if valori == 's':
                 # Inserimento valore massimo
@@ -177,10 +177,10 @@ def operazioni(stub):
     while True:
         print("\nScegli un'opzione:")
         print("1. Aggiungi ticker")
-        print("2. Visualizza tutti i ticker") #mostrare anche minimo e massimo
+        print("2. Visualizza tutti i ticker") 
         print("3. Sostituisci ticker")
         print("4. Elimina un ticker ")
-        print("5. Modifica/Aggiungi valore minimo e massimo di un ticker") # da fare
+        print("5. Modifica/Aggiungi valore minimo e massimo di un ticker") 
         print("6. Ottieni ultimo valore")
         print("7. Ottieni media valori")
         print("8. Elimina utente")
