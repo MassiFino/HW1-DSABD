@@ -16,35 +16,10 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker1:29092
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
       - "29092:29092"
   
-  broker2:
-    image: confluentinc/cp-kafka:7.2.1
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 2
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker2:29093
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
-    ports:
-      - "29093:29093"
-    
-  broker3:
-    image: confluentinc/cp-kafka:7.2.1
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 3
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker3:29094
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29094
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
-    ports:
-      - "29094:29094"
   server:
     build: ./DockerCompose/server
     ports:
@@ -71,8 +46,6 @@ services:
     depends_on:
       - db
       - broker1
-      - broker2
-      - broker3
     restart: always
 
   db:
@@ -111,8 +84,6 @@ services:
     depends_on:
       - db
       - broker1
-      - broker2
-      - broker3
     restart: always
 
   alert_notifier_system:
@@ -121,8 +92,6 @@ services:
       - KAFKA_BROKER=broker1:29092
     depends_on:
       - broker1
-      - broker2
-      - broker3
     restart: always
       
 volumes:

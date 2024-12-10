@@ -1,1 +1,2 @@
-requests mysql-connector-python
+requests 
+mysql-connector-python
