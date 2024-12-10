@@ -11,17 +11,17 @@ app_password = 'pqhv svrd rius pxmi'
 
 # Kafka configuration for consumer
 consumer_config = {
-    'bootstrap.servers': 'localhost:29092',  # Indirizzo del broker Kafka
-    'group.id': 'alertNotifierGroup',  # ID del gruppo consumer per la gestione degli offset
-    'auto.offset.reset': 'earliest',  # Inizia a leggere dall'offset più basso
-    'enable.auto.commit': False  # Disabilita il commit automatico per la gestione manuale
+    'bootstrap.servers': 'broker1:29092',  # Usa il nome del servizio del broker nel docker-compose
+    'group.id': 'group2',
+    'enable.auto.commit': False,
+    'auto.offset.reset': 'earliest',  # Parte dal primo messaggio se non c'è offset salvato
 }
 
 consumer = Consumer(consumer_config)  # Inizializza il Kafka consumer
 topic_to_consume = 'to-notifier'  # Topic da cui leggere messaggi
 # Funzione per inviare notifiche tramite Telegram
 
-def send_telegram_message(message):
+def send_telegram_message(message, chat_id):
     """Invia un messaggio tramite Telegram"""
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
@@ -56,23 +56,8 @@ def send_email(to_email, subject, body):
     except Exception as e:
         print(f"Errore nell'invio dell'email a {to_email}: {e}")
 
-# Test manuale per verificare se l'email viene inviata
-print("Esecuzione test manuale per verificare l'invio delle email...")
-send_email(
-    to_email='dario.r1208@gmail.com@',  # Modifica con il tuo indirizzo email
-    subject='Test Email Manuale',
-    body='Questo è un messaggio di test inviato manualmente per verificare la connessione Gmail SMTP.'
-)
-print("Test manuale completato.")
 # Variabili di stato per memorizzare messaggi ricevuti
 received_messages = []  # Buffer per memorizzare i messaggi in arrivo
-message_count = 0  # Contatore per tracciare il numero di messaggi ricevuti
-
-# Prova manuale per inviare un messaggio Telegram
-print("\nEsecuzione test manuale per verificare l'invio di un messaggio Telegram...")
-test_message = "🔔 Test manuale: Questo è un messaggio di prova Telegram!"
-send_telegram_message(test_message)
-print("Test manuale completato.\n")
 
 # Sottoscrivi il consumer al topic desiderato
 consumer.subscribe([topic_to_consume])
@@ -80,7 +65,7 @@ consumer.subscribe([topic_to_consume])
 try:
     while True:
         # Poll per un nuovo messaggio dal topic Kafka
-        msg = consumer.poll(1.0)  # Aspetta fino a 1 secondo per un messaggio
+        msg = consumer.poll(300.0)  # Aspetta fino a 5 minutinper un messaggio
         if msg is None:
             # Nessun messaggio ricevuto entro il tempo di polling
             continue
@@ -94,35 +79,44 @@ try:
 
         # Decodifica il messaggio ricevuto (assunto JSON)
         data = json.loads(msg.value().decode('utf-8'))
-        received_messages.append(data)  # Memorizza il messaggio ricevuto
-        message_count += 1  # Incrementa il contatore di messaggi
 
-        # Verifica che il messaggio contenga le informazioni necessarie
-        if 'email' in data and 'ticker' in data and 'condition' in data:
-            # Prepara il messaggio email
-            subject = f"Alert per {data['ticker']}"
-            body = (
-                f"Salve,\n\n"
-                f"Il ticker '{data['ticker']}' ha attivato la seguente condizione:\n"
-                f"{data['condition']}\n"
-                f"Valore più recente: {data['latest_value']}\n\n"
-                f"Distinti saluti,\nSistema di Notifiche Alert"
-            )
-            # Invia l'email al destinatario
-            send_email(data['email'], subject, body)
-             # Invia anche la notifica Telegram
-            telegram_message = (
-                f"🚀 Alert: Il ticker '{data['ticker']}' ha attivato la seguente condizione:\n"
-                f"{data['condition']}\n"
-                f"Valore più recente: {data['latest_value']}"
-            )
-            send_telegram_message(telegram_message)
-        else:
-            print("Dati incompleti ricevuti. Salto del messaggio.")
+        received_messages.append(data)  # Add the parsed message to the buffer
 
         # Commette l'offset manualmente per garantire che il messaggio venga processato solo una volta
         consumer.commit(asynchronous=False)
         print(f"Offset commesso per il messaggio: {msg.offset()}")
+
+        # Verifica che il messaggio sia una lista di dizionari
+        if isinstance(received_messages, list):
+            for item in data:
+                # Verifica che l'elemento contenga le informazioni necessarie
+                if 'email' in item and 'ticker' in item and 'condition' in item and 'latest_value' in item:
+                    # Prepara l'email per l'utente
+                    subject = f"Alert per {item['ticker']}"
+                    body = (
+                        f"Salve,\n\n"
+                        f"Il ticker '{item['ticker']}' ha attivato la seguente condizione:\n"
+                        f"{item['condition']}\n"
+                        f"Valore più recente: {item['latest_value']}\n\n"
+                        f"Distinti saluti,\nSistema di Notifiche Alert"
+                    )
+                    # Invia l'email
+                    send_email(item['email'], subject, body)
+
+                    # Prepara e invia la notifica Telegram (se chat_id è presente)
+                    if 'chat_id' in item and item['chat_id']:
+                        telegram_message = (
+                            f"🚀 Alert: Il ticker '{item['ticker']}' ha attivato la seguente condizione:\n"
+                            f"{item['condition']}\n"
+                            f"Valore più recente: {item['latest_value']}"
+                        )
+                        send_telegram_message(telegram_message, item['chat_id'])
+
+                    received_messages = []
+                else:
+                    print(f"Elemento incompleto ricevuto: {item}")
+        else:
+            print("Messaggio ricevuto non è una lista. Ignorato.")
 
 except KeyboardInterrupt:
     # Interruzione pulita del consumer

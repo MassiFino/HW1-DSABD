@@ -6,13 +6,14 @@ import json
 
 # Kafka configuration for consumer and producer
 consumer_config = {
-    'bootstrap.servers': 'localhost:29092',  # Kafka broker address
-    'group.id': 'group1',  # Consumer group ID
-    'enable.auto.commit': False,  # Automatically commit offsets periodically
+    'bootstrap.servers': 'broker1:29092',  # Usa il nome del servizio del broker nel docker-compose
+    'group.id': 'group1',  # Cambia il group.id per differenziare i consumatori se necessario
+    'enable.auto.commit': False,
+    'auto.offset.reset': 'earliest',  # Parte dal primo messaggio se non c'è offset salvato
 }
 
 producer_config = {
-    'bootstrap.servers': 'localhost:29092',
+    'bootstrap.servers': 'broker1:29092',
     'acks': 'all', 
     'max.in.flight.requests.per.connection': 1,  # Only one in-flight request per connection
     'retries': 3  # Retry up to 3 times on failure
