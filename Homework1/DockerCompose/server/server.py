@@ -5,6 +5,8 @@ import mysql.connector
 import mysql.connector.errors
 from threading import Lock
 from datetime import datetime
+import CQRS_Pattern.command_db as command_db
+#import CQRS_Pattern.query_db
 
 cache = {
     "request_cache": {},
@@ -80,59 +82,44 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
                 print(f"Risposta in cache per UserID {userid}")
                 return cache["request_cache"][userid]
         
-        conn = self.get_db_connection()
-        if conn is None:
-            response = service_pb2.RegisterUserReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
-            )
-            with cache_lock:
-                cache["request_cache"][userid] = response
-        
-            return response
-        cursor = conn.cursor()
-        #email è una chiave primaria, se l'utente è già registrato non verrà inserito
 
-        cursor.execute("SELECT email FROM Users WHERE email = %s", (request.email,))
-        if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO Users (email) VALUES (%s)", (request.email,))
-            print("utente inserito")
-
-        else:
-            response = service_pb2.RegisterUserReply(
-                success=False, 
-                message=f"Email: {request.email} già presente nel database"
-            )
-
-            with cache_lock:
-                cache["request_cache"][userid] = response
-        
-            return response
-        
-        #ticker è una chiave primaia, se il ticker è già presente non verrà inserito
-        cursor.execute("SELECT ticker FROM Tickers WHERE ticker = %s", (request.ticker,))
-        if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO Tickers (ticker) VALUES (%s)", (request.ticker,))
-        
-        print("abbiamo inserito il ticker se non presente")
-        cursor.execute("INSERT INTO UserTickers (user, ticker, max_value, min_value) VALUES (%s, %s, %s, %s)", (request.email, request.ticker, request.max_value, request.min_value))
-        print("abbiamo inserito il ticker per l'utente")
-        conn.commit()
-
-        conn.close()
-
-        global identifier
-        identifier = request.email
-
-        response = service_pb2.RegisterUserReply(
-            success=True, 
-            message=f"Utente {request.email} registrato con successo!"
+        cmd = command_db.RegisterUserCommand(
+            email=request.email,
+            ticker=request.ticker,
+            max_value=request.max_value,
+            min_value=request.min_value
         )
-    
-        with cache_lock:
-            cache["request_cache"][userid] = response
+
+        write_service = command_db.WriteService()
+
+        try:
+            # Tenta di eseguire la logica di scrittura
+            write_service.handle_register_user(cmd)
+            
+            global identifier
+            identifier = request.email
+
+            response = service_pb2.RegisterUserReply(
+                success=True, 
+                message=f"Utente {request.email} registrato con successo!"
+            )
+
+            with cache_lock:
+                cache["request_cache"][userid] = response
+            
+            return response
+
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response = service_pb2.RegisterUserReply(
+                success=False,
+                message=str(e)
+            )
+            with cache_lock:
+                cache["request_cache"][userid] = response
+            return response
         
-        return response
     
     def UpdateUser(self, request, context):
         """Metodo per aggiornare il codice dell'azione dell'utente."""
