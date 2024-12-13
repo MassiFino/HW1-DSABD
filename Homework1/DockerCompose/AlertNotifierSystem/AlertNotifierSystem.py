@@ -6,7 +6,7 @@ import requests
 
 bot_token = "7587852566:AAH0pXlB_VHM-UW1BZwhed5A9WzQnvLd5y8"  # Token del bot
 chat_id = "324775130"  # Usa il tuo chat_id qui 
-app_password = 'pqhv svrd rius pxmi'
+app_password = 'hymj pfrc fzha zetl'
 
 
 # Kafka configuration for consumer
@@ -44,13 +44,13 @@ def send_email(to_email, subject, body):
         # Crea il messaggio email
         msg = MIMEText(body)  # Imposta il corpo dell'email
         msg['Subject'] = subject  # Imposta l'oggetto
-        msg['From'] = 'dariooor.00@gmail.com'  # Sostituisci con il tuo indirizzo Gmail
+        msg['From'] = 'hwdsbd@gmail.com'  # Sostituisci con il tuo indirizzo Gmail
         msg['To'] = to_email  # Imposta il destinatario
 
         # Configura il server SMTP di Gmail
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()  # Avvia la connessione TLS
-            server.login('dariooor.00@gmail.com', app_password)  # Login con Gmail App Password
+            server.login('hwdsbd@gmail.com', app_password)  # Login con Gmail App Password
             server.send_message(msg)  # Invia il messaggio
             print(f"Email inviata con successo a: {to_email}")
     except Exception as e:

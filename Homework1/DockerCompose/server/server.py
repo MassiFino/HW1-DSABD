@@ -35,7 +35,7 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
         except mysql.connector.Error as err:
             print(f"Errore durante la connessione al database: {err}")
             return None
-    
+    #Read
     def LoginUser(self, request, context):
         "Login Utente"
 
@@ -66,9 +66,7 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
                 message=f"Ti stiamo reindirizzando alla pagina principale"
             )
 
-
-        
-
+    #Write
     def RegisterUser(self, request, context):
         """Metodo per registrare un utente."""
         meta = dict(context.invocation_metadata())
@@ -119,8 +117,7 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
             with cache_lock:
                 cache["request_cache"][userid] = response
             return response
-        
-    
+    #Write
     def UpdateUser(self, request, context):
         """Metodo per aggiornare il codice dell'azione dell'utente."""
 
@@ -135,196 +132,116 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
                 print(f"Risposta in cache per RequestID {requestid}")
                 return cache["update_cache"][requestid]
 
-        conn = self.get_db_connection()
-        if conn is None:
+        cmd = command_db.UpdateUserCommand(
+            email=identifier,
+            ticker_old=request.ticker_old,
+            ticker=request.ticker,
+            max_value=request.max_value,
+            min_value=request.min_value
+        )
+        
+        write_service = command_db.WriteService()
+        try:
+            write_service.handle_update_user(cmd)
+        
+        
             response = service_pb2.UpdateUserReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
-            )
-
-            with cache_lock:
-                cache["update_cache"][requestid] = response
-        
-            return response
-
-
-        
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s", (identifier,))
-        rows = cursor.fetchall()  # Recupera tutte le righe associate all'utente
-
-        # Controllo se ticker_old è presente tra i tickers associati all'utente
-        tickers = [row[0] for row in rows] 
-
-        if request.ticker_old not in tickers:
-            response = service_pb2.UpdateUserReply(
-            success=False,
-            message=f"Ticker: {request.ticker_old} non trovato per l'utente {identifier}"
-            )
-            with cache_lock:
-                cache["update_cache"][requestid] = response
-        
-            return response
-
-        if request.ticker in tickers:
-            response = service_pb2.UpdateUserReply(
-            success=False,
-            message=f"Ticker: {request.ticker} è già associato all'utente {identifier}"
-            )
-            with cache_lock:
-                cache["update_cache"][requestid] = response
-        
-            return response
-        
-        cursor.execute("SELECT ticker FROM Tickers WHERE ticker = %s", (request.ticker,))
-
-        if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO Tickers (ticker) VALUES (%s)", (request.ticker,))
-            
-        cursor.execute("UPDATE UserTickers SET ticker = %s, max_value = %s, min_value = %s WHERE user = %s AND ticker = %s", (request.ticker,request.max_value, request.min_value, identifier, request.ticker_old))
-
-        cursor.execute("SELECT COUNT(*) FROM UserTickers WHERE ticker = %s", (request.ticker_old,))
-        count = cursor.fetchone()[0]  # Ottieni il numero di associazioni
-
-        if count == 0:  # Se non ci sono altre associazioni
-        # Elimina il ticker dalla tabella Tickers
-            cursor.execute("DELETE FROM Tickers WHERE ticker = %s", (request.ticker_old,))
-            print(f"Ticker {request.ticker_old} eliminato perché non più associato ad altri utenti.")
-        else:
-            print(f"Ticker {request.ticker_old} è ancora associato a {count} utente/i.")
-
-        conn.commit()
-        conn.close()
-        
-        response = service_pb2.UpdateUserReply(
             success=True, 
             message=f"Codice dell'azione aggiornato per l'utente {identifier}!"
-        )
-        with cache_lock:
-            cache["update_cache"][requestid] = response
-        
-        return response
-        
-    def DeleteTickerUser(self, request, context):
-        conn = self.get_db_connection()
-        if conn is None:
-            return service_pb2.DeleteTickerUserReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
             )
+            with cache_lock:
+                cache["update_cache"][requestid] = response
         
-        cursor = conn.cursor()
-        ticker = request.ticker  # Ticker specifico da eliminare
-        print(f"Utente: {identifier}, Ticker da eliminare: {ticker}")
-
-        cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s AND ticker = %s", (identifier, ticker))
-
-        if cursor.fetchone() is None:
-            return service_pb2.DeleteTickerUserReply(
-            success=False,
-            message=f"Ticker: {request.ticker} non trovato per l'utente {identifier}"
+            return response
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response = service_pb2.UpdateUserReply(
+                success=False,
+                message=str(e)
             )
+            with cache_lock:
+                cache["update_cache"][requestid] = response
         
-      
-        cursor.execute("DELETE FROM UserTickers WHERE user = %s AND ticker = %s", (identifier, ticker))
-        print(f"Ticker {ticker} eliminato dalla tabella UserTickers per l'utente {identifier}.")
-        # Controllo se ticker_old è presente tra i tickers associati all'utente
-        cursor.execute("SELECT COUNT(*) FROM UserTickers WHERE ticker = %s", (ticker,))
-        count = cursor.fetchone()[0]
-        if count == 0:  # Se non è associato a nessun altro utente
-            cursor.execute("DELETE FROM Tickers WHERE ticker = %s", (ticker,))
-            print(f"Ticker {ticker} eliminato perché non più associato ad altri utenti.")
-
-        conn.commit()
-
-        conn.close()
+            return response
         
-        return service_pb2.DeleteTickerUserReply(
-        success=True,
-        message=f"Ticker {request.ticker} eliminato con successo."
-        )
+    #Write
+    def DeleteTickerUser(self, request,context):
        
-
-
-    def DeleteUser(self, request, context):
-        """Metodo per eliminare un utente."""
-        conn = self.get_db_connection()
-        if conn is None:
-            return service_pb2.DeleteUserReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
+        cmd = command_db.DeleteTickerUserCommand(
+            email=identifier,
+            ticker=request.ticker,
+           
+        )
+        write_service = command_db.WriteService()
+        try:
+            # Tenta di eseguire la logica di scrittura
+            write_service.handle_delete_ticker_user(cmd)
+           
+            response = service_pb2.DeleteTickerUserReply(
+                success=True, 
+                message=f"Ticker {request.ticker} dell'utente : {identifier} eliminato con successo!"
             )
+            return response
 
-        
-        print(f"email: {identifier}")
-        
-        cursor = conn.cursor()
-        cursor.execute("Select ticker FROM UserTickers WHERE user = %s", (identifier,))
-        rows = cursor.fetchall()
-
-        tickers = [row[0] for row in rows]  # row[0] contiene il valore di "ticker"
-
-        print(f"ticker: {tickers}")
-    
-        cursor.execute("DELETE FROM Users WHERE email = %s", (identifier,))
-
-        print("siamo dopo l'eliminazione")
-
-        for ticker in tickers:
-            cursor.execute("SELECT COUNT(*) FROM UserTickers WHERE ticker = %s", (ticker,))
-            count = cursor.fetchone()[0]
-
-            if count == 0:  # Se non è associato a nessun altro utente
-                cursor.execute("DELETE FROM Tickers WHERE ticker = %s", (ticker,))
-                print(f"Ticker {ticker} eliminato perché non più associato ad altri utenti.")
-        
-        conn.commit()
-        
-        conn.close()
-
-
-        return service_pb2.DeleteUserReply(
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response = service_pb2.DeleteTickerUserReply(
+                success=False,
+                message=str(e)
+            )
+            return response
+    #Write
+    def DeleteUser(self,request,context):
+        """Metodo per eliminare un utente."""
+        cmd = command_db.DeleteUserCommand(
+            email=identifier
+           
+        )
+        write_service = command_db.WriteService()
+       
+        try:
+            write_service.handle_delete_user(cmd)
+            return service_pb2.DeleteUserReply(
             success=True, 
             message=f"Utente {identifier} eliminato con successo!"
-        )
-    
+            )
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response = service_pb2.DeleteTickerUserReply(
+                success=False,
+                message=str(e)
+            )
+            return response
+    #Write 
     def AddTickerUtente(self, request, context):
-        """Metodo per aggiungere un ticker all'utente."""
-        conn = self.get_db_connection()
-        if conn is None:
-            return service_pb2.AddTickerUtenteReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
-            )
-        
-        cursor = conn.cursor()
-
-        #controllo se l'utente ha già quel ticker
-        cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s AND ticker = %s", (identifier, request.ticker))
-
-        if cursor.fetchone() is not None:
-            return service_pb2.AddTickerUtenteReply(
-                success=False, 
-                message=f"Ticker {request.ticker} già presente per l'utente {identifier}!"
-            )
-                
-        cursor.execute("SELECT ticker FROM Tickers WHERE ticker = %s", (request.ticker,))
-
-        if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO Tickers (ticker) VALUES (%s)", (request.ticker,))
-        
-        cursor.execute("INSERT INTO UserTickers (user, ticker, max_value, min_value) VALUES (%s, %s, %s, %s)", (identifier, request.ticker, request.max_value, request.min_value))
-        
-        conn.commit()
-        conn.close()
-
-        return service_pb2.AddTickerUtenteReply(
-            success=True, 
-            message=f"Ticker {request.ticker} aggiunto all'utente {identifier}!"
+        cmd = command_db.AddTickerCommand(
+            email=identifier,
+            ticker=request.ticker,
+            max_value=request.max_value,
+            min_value=request.min_value
+           
         )
-    
+        write_service = command_db.WriteService()
+        try:
+            # Tenta di eseguire la logica di scrittura
+            write_service.handle_addTicker(cmd)
 
+            return service_pb2.AddTickerUtenteReply(
+                success=True, 
+                message=f"Ticker {request.ticker} aggiunto all'utente {identifier}!"
+        )
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response = service_pb2.AddTickerUtenteReply(
+                success=False,
+                message=str(e)
+            )
+            return response
+    #Read
     def ShowTickersUser(self, request, context):
         conn = self.get_db_connection()
         if conn is None:
@@ -355,7 +272,7 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
             message="Ticker recuperati con successo",
             ticker=tickers_list
         )
-    
+    #Read
     def GetLatestValue(self, request, context):
         """Metodo per ottenere l'ultimo valore dell'azione dell'utente."""
         conn = self.get_db_connection()
@@ -420,7 +337,7 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
             stock_value=stock_value, 
             timestamp=datetime_str
         )
-    
+    #Read
     def GetAverageValue(self, request, context):
         """Metodo per ottenere la media dei valori dell'azione dell'utente."""
         conn = self.get_db_connection()
@@ -480,50 +397,32 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
             average_stock_value=media_valori, 
             timestamp=datetime_str
         )
-
+    #Write
     #metodo per modificare il valore minimo e massimo di un ticker
-    def UpdateMinMaxValue(self, request, context):
-        conn = self.get_db_connection()
-        if conn is None:
-            return service_pb2.UpdateMinMaxValueReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
-            )
-        
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s AND ticker = %s", (identifier,request.ticker))
-
-        row = cursor.fetchone()
-
-        if row is None:
-            print("Nessuna riga trovata per l'utente specificato.")
-            return service_pb2.UpdateMinMaxValueReply(
-            success=False,
+    def UpdateMinMaxValue(self, request,context):
+        cmd = command_db.UpdateMinMaxValueCommand(
+            email=identifier,
             ticker=request.ticker,
-            message = "Non hai questo ticker tra quelli di interesse, codice ticker"
-            )
-        
-        #prima di modificare controllo se i valori inseriti sono uguali a quelli già presenti
-        cursor.execute("SELECT max_value, min_value FROM UserTickers WHERE user = %s AND ticker = %s", (identifier, request.ticker))
-        row = cursor.fetchone()
-        if row[0] == request.max_value and row[1] == request.min_value:
-            return service_pb2.UpdateMinMaxValueReply(
-            success=False,
-            ticker=request.ticker,
-            message = "I valori inseriti sono uguali a quelli già presenti"
-            )
-
-        cursor.execute("UPDATE UserTickers SET max_value = %s, min_value = %s WHERE user = %s AND ticker = %s", (request.max_value, request.min_value, identifier, request.ticker))
-
-        conn.commit()
-        conn.close()
-
-        return service_pb2.UpdateMinMaxValueReply(
-            success=True,
-            message="Valori aggiornati con successo"
+            max_value=request.max_value,
+            min_value=request.min_value
         )
 
+        write_service = command_db.WriteService()
 
+        try:
+            write_service.handle_update_min_max_value(cmd)
+            return service_pb2.UpdateMinMaxValueReply(
+            success=True,
+            message="Valori aggiornati con successo"
+            )
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response = service_pb2.RegisterUserReply(
+                success=False,
+                message=str(e)
+            )
+            return response
 # Funzione per avviare il server
 def serve():
     
