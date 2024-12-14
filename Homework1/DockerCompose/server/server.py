@@ -6,7 +6,7 @@ import mysql.connector.errors
 from threading import Lock
 from datetime import datetime
 import CQRS_Pattern.command_db as command_db
-#import CQRS_Pattern.query_db
+import CQRS_Pattern.lecture_db as lecture_db
 
 cache = {
     "request_cache": {},
@@ -38,33 +38,27 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
     #Read
     def LoginUser(self, request, context):
         "Login Utente"
-
-        conn = self.get_db_connection()
-        if conn is None:
-            return service_pb2.RegisterUserReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
-            )
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT email FROM Users WHERE email = %s", (request.email,))
-
-        if cursor.fetchone() is None:
-
-            return service_pb2.RegisterUserReply(
-                success=False, 
-                message=f"Email: {request.email} non è registrata"
-            )
-        
-        
-        global identifier
-        identifier= request.email
-
-
-        return service_pb2.RegisterUserReply(
+        read_service=lecture_db.ReadService()
+        try:
+            global identifier
+            identifier= request.email
+            read_service.login_user(request.email)
+            
+            response=service_pb2.LoginUserReply(
                 success=True, 
                 message=f"Ti stiamo reindirizzando alla pagina principale"
             )
+            return response
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response = service_pb2.LoginUserReply(
+                success=False,
+                message=str(e)
+            )   
+        
+        return response
+
 
     #Write
     def RegisterUser(self, request, context):
@@ -203,10 +197,11 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
        
         try:
             write_service.handle_delete_user(cmd)
-            return service_pb2.DeleteUserReply(
+            response = service_pb2.DeleteUserReply(
             success=True, 
             message=f"Utente {identifier} eliminato con successo!"
             )
+            return response
         except Exception as e:
         # Se c'è stata un'eccezione, significa che c'è un problema di connessione
         # o l'utente esiste già nel DB, o altre cause.
@@ -229,10 +224,11 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
             # Tenta di eseguire la logica di scrittura
             write_service.handle_addTicker(cmd)
 
-            return service_pb2.AddTickerUtenteReply(
+            response = service_pb2.AddTickerUtenteReply(
                 success=True, 
                 message=f"Ticker {request.ticker} aggiunto all'utente {identifier}!"
         )
+            return response
         except Exception as e:
         # Se c'è stata un'eccezione, significa che c'è un problema di connessione
         # o l'utente esiste già nel DB, o altre cause.
@@ -243,186 +239,73 @@ class EchoService(service_pb2_grpc.EchoServiceServicer):
             return response
     #Read
     def ShowTickersUser(self, request, context):
-        conn = self.get_db_connection()
-        if conn is None:
-            return service_pb2.ShowTickersUserReply(
-                success=False, 
-                message="Errore durante la connessione al database!",
-                ticker=""
-            )
-        
-        cursor = conn.cursor()
-         #controllo se l'utente ha già quel ticker
-        cursor.execute("SELECT ticker, max_value, min_value FROM UserTickers WHERE user = %s", (identifier,))
-        ticker= cursor.fetchall()
-        
-        if not ticker:
-            return service_pb2.ShowTickersUserReply(
-                success=False, 
-                message=f"L'utente {identifier} non ha alcun ticker da visualizzare",
-                ticker=""
-            )
-        
-        tickers_list = "\n".join([f"Ticker: {row[0]}, Max: {row[1]}, Min: {row[2]}" for row in ticker])
-
-        
-        conn.close()
-        return service_pb2.ShowTickersUserReply(
-            success=True,
-            message="Ticker recuperati con successo",
-            ticker=tickers_list
-        )
-    #Read
-    def GetLatestValue(self, request, context):
-        """Metodo per ottenere l'ultimo valore dell'azione dell'utente."""
-        conn = self.get_db_connection()
-        if conn is None:
-            return service_pb2.GetLatestValueReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
-            )
-        
-        
-        print(f"email utente:  {identifier}")
-
-        cursor = conn.cursor()
-        cursor.execute("SELECT Ticker FROM UserTickers WHERE user = %s AND ticker = %s", (identifier,request.ticker))
-
-        row = cursor.fetchone() 
-
-        if row is None:
-            print("Nessuna riga trovata per l'utente specificato.")
-            return service_pb2.GetLatestValueReply(
-            success=False,
-            ticker=request.ticker,
-            message = "Non hai questo ticker tra quelli di interesse, codice ticker"
-            )
-
-        ticker = row[0]
-
-        print(f"ticker: {ticker}")
-    
-        cursor.execute("SELECT value, timestamp FROM TickerData WHERE ticker = %s ORDER BY timestamp DESC LIMIT 1", (ticker,))
-
-        result = cursor.fetchone()
-
-        if result is None:
-            print("Nessuna riga trovata per il ticker specificato.")
-            return service_pb2.GetLatestValueReply(
-            success=False,
-            ticker=ticker,
-            message = "Non è stato ancora aggiornato il ticker"
-            )
-
-        # Se result non è None, procedi con l'unpacking
-        stock_value, timestamp = result
-
-        datetime_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-
-        print(f"stock value: {stock_value}")
-
-        conn.close()
-
-        if stock_value is None:
-            print(f"Nessun valore trovato per il ticker {ticker}")
-            return service_pb2.GetLatestValueReply(
-            success=False,
-            ticker=ticker,
-            message = "Non abbiamo valori per il ticker"
-            )
-        
-        return service_pb2.GetLatestValueReply(
-            success=True, 
-            ticker=ticker, 
-            stock_value=stock_value, 
-            timestamp=datetime_str
-        )
-    #Read
-    def GetAverageValue(self, request, context):
-        """Metodo per ottenere la media dei valori dell'azione dell'utente."""
-        conn = self.get_db_connection()
-        if conn is None:
-            return service_pb2.GetAverageValueReply(
-                success=False, 
-                message="Errore durante la connessione al database!"
-            )
-        
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s AND ticker = %s", (identifier,request.ticker))
-
-        row = cursor.fetchone()
-
-        if row is None:
-            print("Nessuna riga trovata per l'utente specificato.")
-            return service_pb2.GetLatestValueReply(
-            success=False,
-            ticker=request.ticker,
-            message = "Non hai questo ticker tra quelli di interesse, codice ticker"
-            )
-        
-        ticker = row[0]
-        
-        cursor.execute("SELECT AVG(value), MAX(timestamp) FROM TickerData WHERE ticker = %s ORDER BY timestamp DESC LIMIT %s", (ticker, request.num_values))
-
-        result = cursor.fetchone()
-
-        print(f"valore di ritorno select: {result}")
-
-        if result[0] is None and result[1] is None:
-            print("Nessuna riga trovata per il ticker specificato.")
-            return service_pb2.GetLatestValueReply(
-            success=False,
-            ticker=ticker,
-            message = "Non è stato ancora aggiornato il ticker"
-            )
-
-
-        media_valori, timestamp = result
-        
-        conn.close()
-
-        datetime_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-
-        if media_valori is None:
-            return service_pb2.GetAverageValueReply(
-            success=False,
-            ticker = ticker,
-            message = "Non abbiamo valori per il ticker"
-        )
-
-
-        return service_pb2.GetAverageValueReply(
-            success=True,
-            ticker = ticker,
-            average_stock_value=media_valori, 
-            timestamp=datetime_str
-        )
-    #Write
-    #metodo per modificare il valore minimo e massimo di un ticker
-    def UpdateMinMaxValue(self, request,context):
-        cmd = command_db.UpdateMinMaxValueCommand(
-            email=identifier,
-            ticker=request.ticker,
-            max_value=request.max_value,
-            min_value=request.min_value
-        )
-
-        write_service = command_db.WriteService()
-
+        read_service=lecture_db.ReadService()
         try:
-            write_service.handle_update_min_max_value(cmd)
-            return service_pb2.UpdateMinMaxValueReply(
-            success=True,
-            message="Valori aggiornati con successo"
+            tickers_list=read_service.show_ticker_user(identifier)
+            response= service_pb2.ShowTickersUserReply(
+                success=True,
+                message="Ticker recuperati con successo",
+                ticker=tickers_list
             )
+            return response 
         except Exception as e:
         # Se c'è stata un'eccezione, significa che c'è un problema di connessione
         # o l'utente esiste già nel DB, o altre cause.
-            response = service_pb2.RegisterUserReply(
+            response= service_pb2.ShowTickersUserReply(
                 success=False,
+                message=str(e),
+                ticker=""
+            )
+        return response
+        
+       
+        
+    #Read
+    def GetLatestValue(self, request, context):
+        read_service=lecture_db.ReadService()
+        try:
+            stock_value, datetime_str =read_service.get_latest_value(identifier,request.ticker)
+            response=service_pb2.GetLatestValueReply(
+                success=True, 
+                ticker=request.ticker, 
+                stock_value=stock_value,
+                timestamp=datetime_str
+            )
+            return response 
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response=service_pb2.GetLatestValueReply(
+                success=False,
+                ticker="",
+                stock_value="",
+                timestamp="",
                 message=str(e)
             )
-            return response
+        return response
+    #Read
+    def GetAverageValue(self, request, context):
+        read_service=lecture_db.ReadService()
+        try:
+            average_stock_value,datetime_str =read_service.get_average_value(identifier,request.ticker,request.num_values)
+            response= service_pb2.GetAverageValueReply(
+                success=True,
+                ticker = request.ticker,
+                average_stock_value=average_stock_value, 
+                timestamp=datetime_str
+            )
+            return response 
+        except Exception as e:
+        # Se c'è stata un'eccezione, significa che c'è un problema di connessione
+        # o l'utente esiste già nel DB, o altre cause.
+            response=service_pb2.GetAverageValueReply(
+                success=False, 
+                ticker=request.ticker,
+                message=str(e),
+                average_stock_value="", 
+                timestamp=""
+            )
+        return response
 # Funzione per avviare il server
 def serve():
     

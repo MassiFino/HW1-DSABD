@@ -115,7 +115,7 @@ class WriteOperation:
                 cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s AND ticker = %s", (email, ticker))
 
                 if cursor.fetchone() is None:
-                    raise(f"{ticker} non trovato per l'utente {email}")
+                    raise Exception(f"{ticker} non trovato per l'utente {email}")
                 cursor.execute("DELETE FROM UserTickers WHERE user = %s AND ticker = %s", (email, ticker))
                 cursor.execute("SELECT COUNT(*) FROM UserTickers WHERE ticker = %s", (ticker,))
                 count = cursor.fetchone()[0]
@@ -152,7 +152,7 @@ class WriteOperation:
                 #controllo se l'utente ha già quel ticker
                 cursor.execute("SELECT ticker FROM UserTickers WHERE user = %s AND ticker = %s", (email, ticker))
                 if cursor.fetchone() is not None:
-                    raise(f"Ticker {ticker} già presente per l'utente {email}!")
+                    raise Exception(f"Ticker {ticker} già presente per l'utente {email}!")
                 cursor.execute("SELECT ticker FROM Tickers WHERE ticker = %s", (ticker,))
                 if cursor.fetchone() is None:
                     cursor.execute("INSERT INTO Tickers (ticker) VALUES (%s)", (ticker,))

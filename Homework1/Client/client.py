@@ -38,9 +38,13 @@ def verifica_ticker(ticker):
     # Percorso file ticker
     filepath = './nasdaq-listed-symbols.csv'
     valid_tickers = carica_ticker(filepath)
+    if not ticker or ticker.strip() == "":
+        print("Ticker non valido. Il ticker non può essere vuoto o composto solo da spazi. Riprova.")
+        return False
     if ticker.upper() in valid_tickers:
         return True
     print("Ticker non valido. Riprova.")
+    
     return False
 
 def inserisci_valori_min_max():
