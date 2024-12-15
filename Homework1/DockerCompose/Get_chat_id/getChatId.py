@@ -2,34 +2,20 @@ import requests
 import mysql.connector
 import time
 import os
+import CQRS_Pattern.lecture_db as lecture_db
+import CQRS_Pattern.command_db as command_db
 
 bot_token = os.getenv("BOT_TOKEN")
-
-# Configurazione del database
-db_config = {
-    'user': 'root',
-    'password': '1234',
-    'host': 'db',  # Nome del servizio del database in Docker Compose
-    'database': 'yfinance_db',
-    'port': 3306,
-}
 
 def email_exists_for_chat_id(chat_id):
     """Controlla se il chat_id è già associato a un'email nel database."""
     try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor()
-        query = "SELECT email FROM Users WHERE chat_id = %s"
-        cursor.execute(query, (chat_id,))
-        result = cursor.fetchone()
-        return result is not None
-    except mysql.connector.Error as err:
-        print(f"Errore durante la verifica dell'email: {err}")
+        read_service = lecture_db.ReadService()
+        email = read_service.CheckEmail(chat_id)
+        return email is not None
+    except Exception as e:
+        print(f"Errore durante il controllo dell'email: {e}")
         return False
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
 
 def send_telegram_message(message, chat_id):
     """Invia un messaggio tramite Telegram a uno specifico chat_id."""
@@ -46,22 +32,16 @@ def send_telegram_message(message, chat_id):
 
 def save_chat_id_to_db(email, chat_id):
     """Aggiorna il campo chat_id nel database per un'email specifica."""
+
+    command = command_db.SaveChatIdCommand(email, chat_id)
+    write_service = command_db.WriteService()
+
     try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor()
-        query = "UPDATE Users SET chat_id = %s WHERE email = %s"
-        cursor.execute(query, (chat_id, email))
-        conn.commit()
-        if cursor.rowcount > 0:
-            print(f"Chat ID {chat_id} associato con successo all'email {email}.")
-        else:
-            print(f"Nessun utente trovato con l'email {email}.")
-    except mysql.connector.Error as err:
-        print(f"Errore durante l'aggiornamento del database: {err}")
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
+        write_service.handle_save_chatId(command)
+
+    except Exception as e:
+        print(f"messaggio: {e}")
+   
 
 def get_updates_and_process():
     """Ascolta continuamente gli aggiornamenti dal bot Telegram."""

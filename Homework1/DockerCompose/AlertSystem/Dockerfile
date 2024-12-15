@@ -7,6 +7,9 @@ WORKDIR /app
 # Copia il file requirements.txt da DataCollector nel container
 COPY ./AlertSystem.py /app/
 COPY ./requirements.txt /app/
+
+COPY ./CQRS_Pattern /app/CQRS_Pattern/
+
 # Installa le dipendenze
 RUN pip install --no-cache-dir -r /app/requirements.txt
 

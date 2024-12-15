@@ -1,7 +1,7 @@
 from datetime import datetime
-import mysql.connector
 from confluent_kafka import Consumer, Producer, KafkaException
 import json
+import CQRS_Pattern.lecture_db as lecture_db
 
 
 # Kafka configuration for consumer and producer
@@ -18,15 +18,6 @@ producer_config = {
     'max.in.flight.requests.per.connection': 1,  # Only one in-flight request per connection
     'retries': 3  # Retry up to 3 times on failure
 }  # Producer configuration
-
-
-db_config = {
-    'user': 'root',
-    'password': '1234',
-    'host': 'db',  # Questo è l'hostname del tuo database nel Docker Compose
-    'database': 'yfinance_db',  # Il nome del database che hai creato nel tuo Docker Compose
-    'port': 3306,
-}
 
 
 values = []
@@ -51,16 +42,6 @@ def produce_sync(producer, topic, value):
     except Exception as e:
         print(f"Failed to produce message: {e}")
 
-
-
-def get_db_connection():
-    try:
-        connection = mysql.connector.connect(**db_config)
-        if connection.is_connected():
-            return connection
-    except mysql.connector.Error as err:
-        print(f"Errore durante la connessione al database: {err}")
-        return None
     
 
 try:
@@ -86,40 +67,11 @@ try:
             data = json.loads(msg.value().decode('utf-8'))
             print(f"Received: {data}")
 
-            # Connessione al database
-            conn = get_db_connection()
-            if not conn:
-                print("Errore nella connessione al database. Salto il messaggio.")
-                continue  # Salta al prossimo ciclo
+            # Esegue la query per ottenere i valori da notificare
+            read_service = lecture_db.ReadService()
 
-            # Esegui la query sul database
-            cursor = conn.cursor()
-            query = """
-            SELECT 
-                u.email,
-                u.chat_id,
-                ut.ticker,
-                td.value AS latest_value,
-                CASE 
-                    WHEN ut.min_value > 0 AND td.value < ut.min_value THEN CONCAT('Sotto Min Value: ', ut.min_value)
-                    WHEN ut.max_value > 0 AND td.value > ut.max_value THEN CONCAT('Sopra Max Value: ', ut.max_value)
-                END AS `condition`
-            FROM 
-                UserTickers ut
-            JOIN 
-                TickerData td ON ut.ticker = td.ticker
-            JOIN 
-                Users u ON ut.user = u.email
-            WHERE 
-                td.timestamp = (SELECT MAX(timestamp) FROM TickerData WHERE ticker = ut.ticker)
-                AND (
-                    (ut.min_value > 0 AND td.value < ut.min_value) OR
-                    (ut.max_value > 0 AND td.value > ut.max_value)
-                );
-            """
-            cursor.execute(query)
-            results = cursor.fetchall()
-
+            results = read_service.NotifierValues()
+            
             for row in results:
                 email = row[0]
                 chat_id = row[1]
@@ -137,9 +89,6 @@ try:
                 values.append(messaggio)
             
             print(values)
-
-            cursor.close()
-            conn.close()
 
             # Produce il messaggio su Kafka
             produce_sync(producer, topic2, json.dumps(values))

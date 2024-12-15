@@ -8,6 +8,8 @@ WORKDIR /app
 COPY ./DataCollector.py /app/
 COPY ./circuit.py /app/
 COPY ./requirements.txt /app/
+
+COPY ./CQRS_Pattern /app/CQRS_Pattern/
 # Installa le dipendenze
 RUN pip install --no-cache-dir -r /app/requirements.txt
 

@@ -6,18 +6,11 @@ import time
 from circuit import CircuitBreaker, CircuitBreakerOpenException
 from confluent_kafka import Producer
 import json
+import CQRS_Pattern.lecture_db as lecture_db
+import CQRS_Pattern.command_db as command_db
 
 # Configurazione del Circuit Breaker
 circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=5)
-
-
-db_config = {
-    'user': 'root',
-    'password': '1234',
-    'host': 'db',  # Questo è l'hostname del tuo database nel Docker Compose
-    'database': 'yfinance_db',  # Il nome del database che hai creato nel tuo Docker Compose
-    'port': 3306,
-}
 
 
 producer_config = {
@@ -31,38 +24,20 @@ producer_config = {
 producer = Producer(producer_config)
 topic = 'to-alert-system'
 
-def get_db_connection():
-    try:
-        connection = mysql.connector.connect(**db_config)
-        if connection.is_connected():
-            return connection
-    except mysql.connector.Error as err:
-        print(f"Errore durante la connessione al database: {err}")
-        return None
-
 
 def get_tickers():
     """
     Recupera ticker associati dal database.
     :return: Lista di tuple (ticker).
     """
-    conn = get_db_connection()
-    if not conn.is_connected():
-        raise Exception("[Errore] Connessione al database fallita.")
+    read_service = lecture_db.ReadService()
 
     try:
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT ticker FROM Tickers")
-        rows = cursor.fetchall()
-        if not rows:
-            print("[Info] Nessun utente registrato con tickers associati.")
-            return []
-        
-        return [row[0] for row in rows]
-
-    finally:
-        conn.close()
+        tickers = read_service.ShowTicker()
+        return tickers
+    except Exception as e:
+        print(f"[Errore] Recupero ticker fallito: {e}")
+        return []
 
 
 def save_ticker_data(ticker, value, timestamp):
@@ -72,16 +47,14 @@ def save_ticker_data(ticker, value, timestamp):
     :param value: Valore del titolo.
     :param timestamp: Timestamp corrente.
     """
-    conn = get_db_connection()
-    if not conn.is_connected():
-        raise Exception("[Errore] Connessione al database fallita.")
+    command = command_db.SaveTickerDataCommand(ticker, value, timestamp)
+
+    write_service = command_db.WriteService()
 
     try:
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO TickerData (ticker, value, timestamp) VALUES (%s, %s, %s)", (ticker, value, timestamp))
-        conn.commit()
-    finally:
-        conn.close()
+        write_service.handle_ticker_data(command)
+    except Exception as e:
+        print(f"[Errore] Salvataggio dati fallito: {e}")
 
 # Funzione per Processare i Ticker con il Circuit Breaker
 

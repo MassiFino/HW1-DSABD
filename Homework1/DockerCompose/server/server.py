@@ -18,23 +18,7 @@ cache_lock = Lock()
 identifier = None
 
 class EchoService(service_pb2_grpc.EchoServiceServicer):
-    # Configurazione del database (da usare con mysql.connector)
-    db_config = {
-        'user': 'root',
-        'password': '1234',
-        'host': 'db',  # Questo è l'hostname del tuo database nel Docker Compose
-        'database': 'yfinance_db',  # Il nome del database che hai creato nel tuo Docker Compose
-        'port': 3306,
-    }
-
-    def get_db_connection(self):
-        try:
-            connection = mysql.connector.connect(**self.db_config)
-            if connection.is_connected():
-                return connection
-        except mysql.connector.Error as err:
-            print(f"Errore durante la connessione al database: {err}")
-            return None
+    
     #Read
     def LoginUser(self, request, context):
         "Login Utente"
