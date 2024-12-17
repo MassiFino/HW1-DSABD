@@ -11,7 +11,7 @@ app_password = 'hymj pfrc fzha zetl'
 
 # Kafka configuration for consumer
 consumer_config = {
-    'bootstrap.servers': 'broker1:29092',  # Usa il nome del servizio del broker nel docker-compose
+    'bootstrap.servers': 'broker1:9092',  # Usa il nome del servizio del broker nel docker-compose
     'group.id': 'group2',
     'enable.auto.commit': False,
     'auto.offset.reset': 'earliest',  # Parte dal primo messaggio se non c'è offset salvato

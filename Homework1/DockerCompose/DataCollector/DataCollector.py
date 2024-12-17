@@ -14,7 +14,7 @@ circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=5)
 
 
 producer_config = {
-    'bootstrap.servers': 'broker1:29092',  # Kafka broker address
+    'bootstrap.servers': 'broker1:9092',  # Kafka broker address
     'acks': 'all',  # Ensure all in-sync replicas acknowledge the message
     'max.in.flight.requests.per.connection': 1,  # Only one in-flight request per connection
     'retries': 3,  # Retry up to 3 times on failure
