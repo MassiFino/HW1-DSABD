@@ -14,12 +14,13 @@ circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=5)
 
 
 producer_config = {
-    'bootstrap.servers': 'broker1:29092',  # Kafka broker address
+    'bootstrap.servers': 'broker1:9092,broker2:9092,broker3:9092',  # Tre broker Kafka
     'acks': 'all',  # Ensure all in-sync replicas acknowledge the message
-    'max.in.flight.requests.per.connection': 1,  # Only one in-flight request per connection
-    'retries': 3,  # Retry up to 3 times on failure
-    'linger.ms':5 #attendiamo 5 secondi prima di mandare il batch successivo
+    'max.in.flight.requests.per.connection': 1,  # Ensure ordering of messages
+    'batch.size': 500,  # Maximum size of a batch in bytes
+    'retries': 3  # Number of retries for failed messages
 }
+
 
 producer = Producer(producer_config)
 topic = 'to-alert-system'
