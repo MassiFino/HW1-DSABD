@@ -86,7 +86,6 @@ services:
       - BOT_TOKEN=7587852566:AAH0pXlB_VHM-UW1BZwhed5A9WzQnvLd5y8
     depends_on:
       - db
-      - broker1
     restart: always
 
 
