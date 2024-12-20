@@ -14,15 +14,13 @@ services:
     hostname: schema-registry
     depends_on:
       - broker1
-      - broker2
-      - broker3
     ports:
       - "8081:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
       SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker2:9092,PLAINTEXT_INTERNAL://localhost:29092
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker1:9092,PLAINTEXT_INTERNAL://localhost:29092
       SCHEMA_REGISTRY_DEBUG: 'true'
 
   broker1:
@@ -37,35 +35,8 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker1:9092,PLAINTEXT_INTERNAL://localhost:19092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
-  broker2:
-    image: confluentinc/cp-kafka:latest
-    hostname: broker2
-    ports:
-      - "29092:29092"
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 2
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker2:9092,PLAINTEXT_INTERNAL://localhost:29092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
-  broker3:
-    image: confluentinc/cp-kafka:latest
-    hostname: broker3
-    ports:
-      - "39092:39092"
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 3
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker3:9092,PLAINTEXT_INTERNAL://localhost:39092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  
   server:
     build: ./DockerCompose/server
     ports:
@@ -88,12 +59,10 @@ services:
       - DATABASE_USER=root
       - DATABASE_PASSWORD=1234
       - DATABASE_NAME=yfinance_db
-      - KAFKA_BROKER=broker1:9092,broker2:9092,broker3:9092  
+      - KAFKA_BROKER=broker1:9092
     depends_on:
       - db
       - broker1
-      - broker2
-      - broker3  
     restart: always
 
   db:
@@ -115,12 +84,9 @@ services:
       - DATABASE_PASSWORD=1234
       - DATABASE_NAME=yfinance_db
       - BOT_TOKEN=7587852566:AAH0pXlB_VHM-UW1BZwhed5A9WzQnvLd5y8
-      - KAFKA_BROKER=broker1:9092,broker2:9092,broker3:9092  
     depends_on:
       - db
       - broker1
-      - broker2
-      - broker3 
     restart: always
 
 
@@ -131,23 +97,19 @@ services:
       - DATABASE_USER=root
       - DATABASE_PASSWORD=1234
       - DATABASE_NAME=yfinance_db
-      - KAFKA_BROKER=broker1:9092,broker2:9092,broker3:9092  # Modifica per usare tutti e tre i broker
+      - KAFKA_BROKER=broker1:9092
     depends_on:
       - db
       - broker1
-      - broker2
-      - broker3  
     restart: always
 
   alert_notifier_system:
     build: ./DockerCompose/AlertNotifierSystem
     environment:
-    - KAFKA_BROKER=broker1:9092,broker2:9092,broker3:9092  # Modifica per usare tutti e tre i broker
+    - KAFKA_BROKER=broker1:9092
     depends_on:
       - db
       - broker1
-      - broker2
-      - broker3  
     restart: always
       
 volumes:

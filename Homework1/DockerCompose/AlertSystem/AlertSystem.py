@@ -6,7 +6,7 @@ import CQRS_Pattern.lecture_db as lecture_db
 
 # Kafka configuration for consumer and producer
 consumer_config = {
-    'bootstrap.servers': 'broker1:9092,broker2:9092,broker3:9092',  # Tre broker Kafka
+    'bootstrap.servers': 'broker1:9092',
     'group.id': 'group1',  # Cambia il group.id per differenziare i consumatori se necessario
     'enable.auto.commit': False,
     'auto.offset.reset': 'earliest',  # Parte dal primo messaggio se non c'è offset salvato
@@ -14,10 +14,9 @@ consumer_config = {
 
 
 producer_config = {
-    'bootstrap.servers': 'broker1:9092,broker2:9092,broker3:9092',  # Tre broker Kafka
+    'bootstrap.servers': 'broker1:9092',  # Tre broker Kafka
     'acks': 'all',  # Ensure all in-sync replicas acknowledge the message
     'max.in.flight.requests.per.connection': 1,  # Ensure ordering of messages
-    'batch.size': 500,  # Maximum size of a batch in bytes
     'retries': 3  # Number of retries for failed messages
 }
 

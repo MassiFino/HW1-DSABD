@@ -14,10 +14,9 @@ circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=5)
 
 
 producer_config = {
-    'bootstrap.servers': 'broker1:9092,broker2:9092,broker3:9092',  # Tre broker Kafka
+    'bootstrap.servers': 'broker1:9092',
     'acks': 'all',  # Ensure all in-sync replicas acknowledge the message
     'max.in.flight.requests.per.connection': 1,  # Ensure ordering of messages
-    'batch.size': 500,  # Maximum size of a batch in bytes
     'retries': 3  # Number of retries for failed messages
 }
 
